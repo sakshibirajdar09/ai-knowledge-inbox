@@ -4,7 +4,7 @@ import { AddContent } from './components/AddContent';
 import { ItemList } from './components/ItemList';
 import { QuestionBox } from './components/QuestionBox';
 import { AnswerCard } from './components/AnswerCard';
-import { getItems, deleteItem, queryKnowledge } from './services/api';
+import { getItems, deleteItem, queryKnowledgeStream } from './services/api';
 import type { SavedItem, ChatMessage } from './types';
 
 interface ChatSession {
@@ -111,29 +111,31 @@ function App() {
       content: question,
     };
     
-    setMessages(prev => [...prev, userMessage]);
+    const aiMessageId = crypto.randomUUID();
+    const aiMessagePlaceholder: ChatMessage = {
+      id: aiMessageId,
+      role: 'assistant',
+      content: '',
+      sources: [],
+      isLoading: true
+    };
+    
+    setMessages(prev => [...prev, userMessage, aiMessagePlaceholder]);
     setQueryLoading(true);
 
     try {
-      const result = await queryKnowledge(question);
-      
-      const aiMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: result.answer,
-        sources: result.sources,
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
+      await queryKnowledgeStream(
+        question,
+        (sources) => {
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, sources } : m));
+        },
+        (chunk) => {
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: m.content + chunk, isLoading: false } : m));
+        }
+      );
     } catch (error) {
       console.error('Failed to query knowledge:', error);
-      const errorMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: "I encountered an error trying to process that request. Please try again.",
-        sources: []
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: "I encountered an error trying to process that request. Please try again.", isLoading: false } : m));
     } finally {
       setQueryLoading(false);
     }
@@ -254,17 +256,12 @@ function App() {
                       </div>
                     ) : (
                       <div className="w-full min-w-0">
-                        <AnswerCard answer={msg.content} sources={msg.sources || []} />
+                        <AnswerCard answer={msg.content} sources={msg.sources || []} isLoading={msg.isLoading} />
                       </div>
                     )}
                   </div>
                 ))}
                 
-                {queryLoading && (
-                  <div className="flex justify-start w-full animate-fade-in">
-                    <AnswerCard answer="" sources={[]} isLoading={true} />
-                  </div>
-                )}
                 <div ref={messagesEndRef} />
               </div>
             )}

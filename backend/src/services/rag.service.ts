@@ -1,10 +1,10 @@
 import { generateEmbedding } from './embedding.service';
 import { searchSimilarChunks } from './vector.service';
-import { generateAnswer } from './llm.service';
+import { generateAnswerStream } from './llm.service';
 import { knowledgeRepository } from '../repositories/knowledge.repository';
 import { logger } from '../utils/logger';
 
-export const queryKnowledge = async (question: string) => {
+export const queryKnowledgeStream = async (question: string) => {
   try {
     // 1. Generate question embedding
     const questionEmbedding = await generateEmbedding(question);
@@ -14,7 +14,7 @@ export const queryKnowledge = async (question: string) => {
     
     if (topChunks.length === 0) {
       return {
-        answer: "The saved knowledge does not contain enough information to answer this question.",
+        stream: null,
         sources: []
       };
     }
@@ -41,10 +41,10 @@ export const queryKnowledge = async (question: string) => {
     ).join('\n\n');
     
     // 5. Query LLM
-    const answer = await generateAnswer(question, context);
+    const stream = await generateAnswerStream(question, context);
     
     return {
-      answer,
+      stream,
       sources
     };
   } catch (error) {

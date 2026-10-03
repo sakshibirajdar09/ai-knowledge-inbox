@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerateContentStreamResult } from '@google/generative-ai';
 import { logger } from '../utils/logger';
 
-export const generateAnswer = async (question: string, context: string): Promise<string> => {
+export const generateAnswerStream = async (question: string, context: string): Promise<GenerateContentStreamResult> => {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -31,15 +31,15 @@ ${context}
   for (let i = 0; i < modelsToTry.length; i++) {
     const currentModel = modelsToTry[i];
     try {
-      logger.info(`Attempting to generate answer with ${currentModel}`);
+      logger.info(`Attempting to generate answer stream with ${currentModel}`);
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ 
         model: currentModel,
         systemInstruction: systemPrompt 
       });
       
-      const result = await model.generateContent(question);
-      return result.response.text();
+      const result = await model.generateContentStream(question);
+      return result;
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       logger.warn(`Failed with model ${currentModel}: ${errorMessage}`);
