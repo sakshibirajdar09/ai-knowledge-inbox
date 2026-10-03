@@ -167,3 +167,19 @@ Open `http://localhost:5173` to view the application.
 - `POST /ingest`: Expects `{ type: "note" | "url", content: "..." }`. Processes, chunks, embeds, and stores the content.
 - `POST /query`: Expects `{ question: "..." }`. Runs similarity search and returns `{ answer: "...", sources: [...] }`.
 - `DELETE /items/:id`: Removes an item and all associated vector chunks from the database.
+
+---
+
+## ⚖️ Tradeoffs & Design Decisions
+- **Why SQLite?**: Simple, zero-configuration, and perfect for a single-user application. Avoids forcing the reviewer to spin up Docker containers or sign up for Pinecone.
+- **Why Naive Chunking?**: A fixed-window approach (600 characters + 100 overlap) is easy to implement, lightweight, and fast enough for standard notes and articles.
+- **Why In-process Vector Search?**: No separate infrastructure is needed. We store `float32` arrays as BLOBs and compute Cosine similarity directly in JS. It is incredibly fast for small datasets (thousands of vectors) and prevents network latency.
+- **Frontend State:** Used pure React hooks and `localStorage` to manage chat history without needing Redux or a complex database schema for user sessions.
+
+## 🔮 What Changes at Scale?
+For a production system with thousands of concurrent users:
+1. **Database**: Move to PostgreSQL with `pgvector` for scalable, indexed similarity search (e.g., HNSW indexes).
+2. **Ingestion**: Move URL fetching and chunking/embedding to background queues (e.g., BullMQ, Redis) to avoid blocking HTTP requests.
+3. **Security**: Add robust SSRF protection for URL fetching, rate limiting, and JWT authentication.
+4. **Chunking**: Use smarter, semantic-aware chunking (e.g., splitting by markdown headers or NLP sentence boundaries) rather than arbitrary fixed windows.
+5. **Caching**: Cache identical queries (e.g., Redis) and aggressively deduplicate fetched URLs.
