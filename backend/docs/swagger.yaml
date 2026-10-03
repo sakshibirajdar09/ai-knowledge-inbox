@@ -1,0 +1,125 @@
+openapi: 3.0.0
+info:
+  title: AI Knowledge Inbox API
+  version: 1.0.0
+  description: API for ingesting notes and URLs into a local RAG pipeline and querying them using Google Gemini embeddings and LLMs.
+
+paths:
+  /api/ingest:
+    post:
+      summary: Ingest a new text note or remote URL
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum: [note, url]
+                title:
+                  type: string
+                  description: Optional custom title
+                content:
+                  type: string
+                  description: Raw text content for notes, or the URL for url type
+      responses:
+        '201':
+          description: Content ingested and indexed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  type:
+                    type: string
+                  message:
+                    type: string
+
+  /api/items:
+    get:
+      summary: Retrieves all saved items
+      tags:
+        - Items
+      responses:
+        '200':
+          description: A list of items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    type:
+                      type: string
+                    title:
+                      type: string
+                    sourceUrl:
+                      type: string
+                    createdAt:
+                      type: string
+
+  /api/items/{id}:
+    delete:
+      summary: Deletes an ingested item and its vector chunks
+      tags:
+        - Items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Item deleted successfully
+
+  /api/query:
+    post:
+      summary: Executes semantic retrieval and grounded LLM generation
+      tags:
+        - Retrieval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+      responses:
+        '200':
+          description: Generated answer and sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer:
+                    type: string
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                        sourceUrl:
+                          type: string
+                        text:
+                          type: string

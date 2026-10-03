@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+.DS_Store
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Build outputs
+dist/
+build/
