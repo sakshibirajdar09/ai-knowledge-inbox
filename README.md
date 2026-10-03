@@ -4,7 +4,7 @@ AI Knowledge Inbox is a production-grade, full-stack personal "second-brain" web
 
 ## 🌟 Features
 - **Semantic Vector Search**: Saved content is chunked, converted into dense embeddings, and searched using cosine similarity.
-- **RAG Generation**: Ask a question, and the system retrieves the Top-K relevant chunks, synthesizes a factual answer, and cites its sources.
+- **Real-Time RAG Streaming (SSE)**: Answers stream in instantly (word-by-word) via Server-Sent Events for a blazing fast ChatGPT-like experience.
 - **Automated Web Scraping**: Paste a URL, and the backend automatically extracts and cleans the readable HTML content.
 - **Persistent Chat Sessions**: Chat history is persisted via `localStorage` allowing you to manage multiple conversation threads.
 - **Dynamic Themes**: A premium, Apple-inspired UI built with Tailwind v4, supporting both a sleek Dark Mode (mesh gradients) and an airy Light Mode (frosted glass).
@@ -174,6 +174,7 @@ Open `http://localhost:5173` to view the application.
 - **Why SQLite?**: Simple, zero-configuration, and perfect for a single-user application. Avoids forcing the reviewer to spin up Docker containers or sign up for Pinecone.
 - **Why Naive Chunking?**: A fixed-window approach (600 characters + 100 overlap) is easy to implement, lightweight, and fast enough for standard notes and articles.
 - **Why In-process Vector Search?**: No separate infrastructure is needed. We store `float32` arrays as BLOBs and compute Cosine similarity directly in JS. It is incredibly fast for small datasets (thousands of vectors) and prevents network latency.
+- **Server-Sent Events (SSE) for Streaming:** We used native SSE over WebSockets. SSE is strictly unidirectional (server-to-client), making it the perfect, lightweight choice for streaming LLM tokens without the overhead of a full WebSocket connection.
 - **Frontend State:** Used pure React hooks and `localStorage` to manage chat history without needing Redux or a complex database schema for user sessions.
 
 ## 🔮 What Changes at Scale?
