@@ -133,11 +133,13 @@ yarn install
 ```
 
 ### 2. Environment Variables
-In the `backend` folder, create a `.env` file:
+Since API keys are sensitive, the `.env` file is intentionally ignored by Git and won't be pushed to GitHub. **You must create it manually.**
+
+Navigate to the `backend` folder and create a new file named `.env`:
 ```env
 PORT=3000
 NODE_ENV=development
-# Required for RAG synthesis
+# Required for RAG synthesis (Get one from Google AI Studio)
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
