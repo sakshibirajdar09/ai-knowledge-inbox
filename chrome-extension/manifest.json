@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "RecallAI Clipper",
+  "version": "1.0",
+  "description": "Instantly save web pages to your AI Knowledge Inbox.",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*"
+  ]
+}

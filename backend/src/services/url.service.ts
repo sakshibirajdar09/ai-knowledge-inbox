@@ -59,6 +59,11 @@ export const fetchUrlContent = async (url: string): Promise<{ title: string, tex
       throw new AppError(422, 'INSUFFICIENT_CONTENT', 'Could not extract enough readable text from this URL');
     }
     
+    // Limit text length to avoid Out-Of-Memory crashes with local embeddings in MVP
+    if (text.length > 20000) {
+      text = text.substring(0, 20000) + '... (Content truncated for size)';
+    }
+
     return { title, text };
   } catch (error: any) {
     logger.error(`Failed to fetch URL: ${url}`, error);
