@@ -12,6 +12,10 @@ class PipelineSingleton {
       const transformers = await new Function("return import('@xenova/transformers')")();
       const { pipeline, env } = transformers;
       env.cacheDir = './.cache';
+      
+      // Force WASM backend with 1 thread to prevent Render OOM / 502 crashes
+      env.backends.onnx.wasm.numThreads = 1;
+
       this.instance = await pipeline(this.task as any, this.model);
     }
     return this.instance;
