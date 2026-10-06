@@ -20,8 +20,8 @@ export const generateEmbedding = async (text: string): Promise<number[]> => {
     const embedder = await PipelineSingleton.getInstance();
     const output = await embedder(text, { pooling: 'mean', normalize: true });
     return Array.from(output.data);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to generate local embedding', error);
-    return [];
+    throw new Error(`Embedding generation failed: ${error.message}`);
   }
 };
