@@ -5,6 +5,7 @@ AI Knowledge Inbox is a production-grade, full-stack personal "second-brain" web
 ## 🌟 Features
 - **Semantic Vector Search**: Saved content is chunked, converted into dense embeddings, and searched using cosine similarity.
 - **Real-Time RAG Streaming (SSE)**: Answers stream in instantly (word-by-word) via Server-Sent Events for a blazing fast ChatGPT-like experience.
+- **Companion Chrome Extension**: Includes a custom Web Clipper extension that lets you instantly ingest any article you are reading with a single click.
 - **Automated Web Scraping**: Paste a URL, and the backend automatically extracts and cleans the readable HTML content.
 - **Persistent Chat Sessions**: Chat history is persisted via `localStorage` allowing you to manage multiple conversation threads.
 - **Dynamic Themes**: A premium, Apple-inspired UI built with Tailwind v4, supporting both a sleek Dark Mode (mesh gradients) and an airy Light Mode (frosted glass).
@@ -158,6 +159,13 @@ cd frontend
 yarn dev
 ```
 Open `http://localhost:5173` to view the application.
+
+### 4. Install the Chrome Extension (Optional)
+To use the Web Clipper:
+1. Open Google Chrome and navigate to `chrome://extensions/`.
+2. Enable **Developer mode** in the top right.
+3. Click **Load unpacked** and select the `chrome-extension` folder located in this repository.
+4. Pin the extension to your toolbar. You can now save any article directly to your Knowledge Inbox!
 
 ---
 
