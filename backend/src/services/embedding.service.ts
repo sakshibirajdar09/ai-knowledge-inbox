@@ -8,7 +8,8 @@ class PipelineSingleton {
   static async getInstance() {
     if (this.instance === null) {
       // Lazy load pipeline so it doesn't block server start
-      const { pipeline } = await import('@xenova/transformers');
+      const { pipeline, env } = await import('@xenova/transformers');
+      env.cacheDir = './.cache';
       this.instance = await pipeline(this.task as any, this.model);
     }
     return this.instance;
