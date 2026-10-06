@@ -20,11 +20,10 @@ AI Knowledge Inbox is a production-grade, full-stack personal "second-brain" web
 - **Why it is best:** The Gemini Flash model offers industry-leading speed (Time-To-First-Token) and an enormous context window, making it perfect for rapid RAG synthesis. It is highly capable of following strict system instructions, such as our "Strict Refusal" prompt which forces the AI to say "The saved knowledge does not contain enough information" when retrieval yields no results.
 
 ### 2. Embeddings Model - Vector Search
-- **Model Used:** `Xenova/all-MiniLM-L6-v2` (Local via HuggingFace Transformers.js)
+- **Model Used:** Google Gemini API (`gemini-embedding-2`)
 - **Why it is best:** 
-  - **Zero Cost & Zero Latency:** Embeddings run locally entirely within the Node.js backend. No network calls to OpenAI or external providers are needed.
-  - **Privacy:** User notes and scraped URLs never leave the machine for embedding generation.
-  - **Efficiency:** Produces dense 384-dimensional vectors that are incredibly fast to compare.
+  - **Memory Efficiency:** We originally used local ML models (all-MiniLM), but they consume over 300MB of RAM and crash free-tier cloud environments (like Render). Moving to Gemini completely offloads the memory constraints.
+  - **High Quality:** Google's 768-dimensional embeddings capture exceptionally rich semantic relationships for highly accurate retrieval.
 
 ---
 
