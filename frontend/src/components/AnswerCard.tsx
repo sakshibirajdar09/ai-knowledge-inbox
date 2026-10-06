@@ -1,3 +1,4 @@
+import  { useId } from 'react';
 import { Link as LinkIcon, FileText, Loader2, Sparkles, Network } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Source } from '../types';
@@ -9,6 +10,8 @@ interface AnswerCardProps {
 }
 
 export const AnswerCard = ({ answer, sources, isLoading }: AnswerCardProps) => {
+  const cardId = useId().replace(/:/g, ""); // Remove colons from useId for valid HTML id
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto animate-pulse">
@@ -57,7 +60,7 @@ export const AnswerCard = ({ answer, sources, isLoading }: AnswerCardProps) => {
                     <button 
                       onClick={(e) => {
                         e.preventDefault();
-                        const el = document.getElementById(`source-${id}`);
+                        const el = document.getElementById(`source-${cardId}-${id}`);
                         if (el) {
                           el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                           el.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50/50', 'dark:bg-[#1a1a1c]');
@@ -94,7 +97,7 @@ export const AnswerCard = ({ answer, sources, isLoading }: AnswerCardProps) => {
                 <CardWrapper 
                   {...linkProps}
                   key={index}
-                  id={`source-${source.citation_id}`}
+                  id={`source-${cardId}-${source.citation_id}`}
                   className="flex-shrink-0 snap-start w-52 p-3 bg-white dark:bg-[#121214] border border-black/[0.05] dark:border-white/[0.06] rounded-xl hover:border-black/[0.1] dark:hover:bg-[#1a1a1c] dark:hover:border-white/[0.12] hover:shadow-md transition-all cursor-pointer group shadow-sm flex flex-col gap-2 relative overflow-hidden"
                 >
                   <div className="absolute top-0 right-0 p-2 opacity-[0.03] dark:opacity-10 group-hover:opacity-[0.06] dark:group-hover:opacity-20 transition-opacity">

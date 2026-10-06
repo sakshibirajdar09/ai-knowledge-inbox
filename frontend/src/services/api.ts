@@ -10,6 +10,14 @@ export const getItems = async (): Promise<SavedItem[]> => {
   return response.json();
 };
 
+export const getItemById = async (id: string): Promise<SavedItem & { rawContent: string }> => {
+  const response = await fetch(`${API_URL}/items/${id}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch item details');
+  }
+  return response.json();
+};
+
 export const ingestContent = async (type: 'note' | 'url', content: string, title?: string) => {
   const response = await fetch(`${API_URL}/ingest`, {
     method: 'POST',

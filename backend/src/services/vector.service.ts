@@ -24,7 +24,7 @@ const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
 export const searchSimilarChunks = async (
   queryEmbedding: number[], 
   limit: number = 5,
-  threshold: number = 0.25
+  threshold: number = 0.65
 ): Promise<{ chunk: Chunk; similarity: number }[]> => {
   try {
     const allChunks = await knowledgeRepository.getAllChunks();

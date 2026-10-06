@@ -46,6 +46,15 @@ export const knowledgeRepository = {
     });
   },
 
+  getItemById: (id: string): Promise<Item | undefined> => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM items WHERE id = ?', [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row as any);
+      });
+    });
+  },
+
   deleteItem: (id: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       const stmt = db.prepare('DELETE FROM items WHERE id = ?');
