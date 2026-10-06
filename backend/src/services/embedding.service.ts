@@ -1,4 +1,3 @@
-import { pipeline } from '@xenova/transformers';
 import { logger } from '../utils/logger';
 
 class PipelineSingleton {
@@ -9,6 +8,7 @@ class PipelineSingleton {
   static async getInstance() {
     if (this.instance === null) {
       // Lazy load pipeline so it doesn't block server start
+      const { pipeline } = await import('@xenova/transformers');
       this.instance = await pipeline(this.task as any, this.model);
     }
     return this.instance;
