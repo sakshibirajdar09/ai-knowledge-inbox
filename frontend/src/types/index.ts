@@ -5,6 +5,8 @@ export interface SavedItem {
   type: ItemType;
   title: string;
   sourceUrl?: string;
+  status?: 'processing' | 'completed' | 'failed';
+  errorMessage?: string;
   createdAt: string;
 }
 

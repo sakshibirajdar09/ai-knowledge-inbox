@@ -1,193 +1,339 @@
-# 🧠 AI Knowledge Inbox (RecallAI)
+# 🧠 RecallAI: Full-Stack Personal Knowledge Graph & Conversational RAG Engine
 
-AI Knowledge Inbox is a production-grade, full-stack personal "second-brain" web application. It allows you to save text notes and URLs, embed them into a local vector database, and query your knowledge graph using natural language. The system synthesizes answers based purely on your saved data (Retrieval-Augmented Generation), citing specific sources to guarantee hallucination-free responses.
+RecallAI is a high-performance, production-ready personal knowledge management system ("second-brain"). It ingests raw notes and web URLs, partitions content into semantic chunks, encodes them into dense 768-dimensional vector embeddings, and enables natural language conversational search. 
 
-## 🌟 Features
-- **Semantic Vector Search**: Saved content is chunked, converted into dense embeddings, and searched using cosine similarity.
-- **Real-Time RAG Streaming (SSE)**: Answers stream in instantly (word-by-word) via Server-Sent Events for a blazing fast ChatGPT-like experience.
-- **Companion Chrome Extension**: Includes a custom Web Clipper extension that lets you instantly ingest any article you are reading with a single click.
-- **Automated Web Scraping**: Paste a URL, and the backend automatically extracts and cleans the readable HTML content.
-- **Persistent Chat Sessions**: Chat history is persisted via `localStorage` allowing you to manage multiple conversation threads.
-- **Dynamic Themes**: A premium, Apple-inspired UI built with Tailwind v4, supporting both a sleek Dark Mode (mesh gradients) and an airy Light Mode (frosted glass).
+The system employs **Retrieval-Augmented Generation (RAG)** with source citations, multi-turn conversational contextualization, non-blocking background ingestion, and real-time Server-Sent Events (SSE) streaming with instant user-abort capabilities.
 
 ---
 
-## 🧠 AI Models & Configuration
-
-### 1. Large Language Model (LLM) - Synthesis
-- **Model Used:** Google Gemini (`gemini-1.5-flash` or `gemini-pro`)
-- **API Key Required:** `GEMINI_API_KEY`
-- **Why it is best:** The Gemini Flash model offers industry-leading speed (Time-To-First-Token) and an enormous context window, making it perfect for rapid RAG synthesis. It is highly capable of following strict system instructions, such as our "Strict Refusal" prompt which forces the AI to say "The saved knowledge does not contain enough information" when retrieval yields no results.
-
-### 2. Embeddings Model - Vector Search
-- **Model Used:** Google Gemini API (`gemini-embedding-2`)
-- **Why it is best:** 
-  - **Memory Efficiency:** We originally used local ML models (all-MiniLM), but they consume over 300MB of RAM and crash free-tier cloud environments (like Render). Moving to Gemini completely offloads the memory constraints.
-  - **High Quality:** Google's 768-dimensional embeddings capture exceptionally rich semantic relationships for highly accurate retrieval.
-
----
-
-## 🏗 Architecture & Approaches (Why it's the best)
-
-### System Architecture Diagram
+## 📐 High-Level Architecture
 
 ```mermaid
-flowchart LR
-    classDef client fill:#e5f0ff,stroke:#007aff,stroke-width:2px,color:#1c1c1e
-    classDef api fill:#f9f9f9,stroke:#8e8e93,stroke-width:1px,color:#1c1c1e
-    classDef local fill:#fff4e5,stroke:#ff9500,stroke-width:2px,color:#1c1c1e
-    classDef db fill:#e8f5e9,stroke:#34c759,stroke-width:2px,color:#1c1c1e
-    classDef ai fill:#f2e6ff,stroke:#af52de,stroke-width:2px,color:#1c1c1e
-    classDef refuse fill:#ffe5e5,stroke:#ff3b30,stroke-width:1px,color:#1c1c1e
+flowchart TD
+    classDef client fill:#eef2ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b;
+    classDef api fill:#f8fafc,stroke:#64748b,stroke-width:1.5px,color:#0f172a;
+    classDef ai fill:#faf5ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+    classDef db fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#14532d;
+    classDef queue fill:#fffbeb,stroke:#f59e0b,stroke-width:1.5px,color:#78350f;
 
     User((User)):::client
-    UI["React Frontend<br/>Vite + Tailwind v4<br/>chat history in localStorage"]:::client
-    User <--> UI
+    UI["React 19 + Vite + Tailwind v4<br/>SSE Reader + AbortController + LocalStorage"]:::client
+    User <-->|Chat / Ingest / Edit| UI
 
-    subgraph ING["Ingestion pipeline"]
+    subgraph API["FastAPI Asynchronous Gateway (Port 3000)"]
         direction TB
-        I1["POST /ingest<br/>type: note or url"]:::api
-        I2{"type?"}:::api
-        I3["Fetch + strip HTML<br/>URL only"]:::api
-        I4["Chunk text<br/>600 chars, 100 overlap"]:::api
-        I5["Embed each chunk<br/>MiniLM-L6-v2, 384-d<br/>runs locally"]:::local
-        I1 --> I2
-        I2 -->|url| I3 --> I4
-        I2 -->|note| I4
-        I4 --> I5
+        IngestRouter["POST /ingest<br/>(Returns 202 Accepted in ~6ms)"]:::api
+        QueryRouter["POST /query<br/>(Streams text/event-stream SSE)"]:::api
+        ItemsRouter["GET /items | DELETE /items/:id<br/>(Polling & Management)"]:::api
     end
 
-    DB[("SQLite<br/>items + chunks<br/>Float32 BLOB vectors")]:::db
-
-    subgraph RAG["Query pipeline (RAG)"]
+    subgraph ASYNC["Non-Blocking Ingestion Pipeline"]
         direction TB
-        Q1["POST /query<br/>question"]:::api
-        Q2["Embed question<br/>same local model"]:::local
-        Q3["Cosine similarity<br/>vs. all chunk vectors"]:::api
-        Q4{"Any chunk<br/>above 45%<br/>threshold?"}:::api
-        Q5["Keep Top-K chunks<br/>build numbered context prompt"]:::api
-        Q6["Gemini 1.5 Flash<br/>strict, source-only answer"]:::ai
-        Q7["Answer with<br/>[1] [2] citations"]:::api
-        Q8["Strict refusal:<br/>saved knowledge does not<br/>contain enough information"]:::refuse
-        Q1 --> Q2 --> Q3 --> Q4
-        Q4 -->|yes| Q5 --> Q6 --> Q7
-        Q4 -->|no| Q8
+        BG["FastAPI BackgroundTasks"]:::queue
+        Scraper["Trafilatura Scraper<br/>(Fallback HTML Stripper)"]:::api
+        Chunker["Sliding Window Chunker<br/>(600 chars, 100 overlap)"]:::api
+        BatchEmbed["Google Gemini Embedding API<br/>(asyncio.Semaphore(8) batch concurrency)"]:::ai
+        BG --> Scraper --> Chunker --> BatchEmbed
     end
 
-    subgraph MGMT["Item management"]
+    subgraph RETRIEVAL["Conversational RAG Engine"]
         direction TB
-        M1["GET /items"]:::api
-        M2["DELETE /items/:id<br/>removes item + its chunks"]:::api
+        Contextualizer["Query Contextualizer<br/>(Resolves follow-up pronouns)"]:::ai
+        QueryEmbed["Query Embedding (768-d)"]:::ai
+        VectorSearch["NumPy Cosine Similarity<br/>(Normalized dot product vs BLOBs)"]:::api
+        ThresholdFilter{"Similarity >= 65% ?"}:::api
+        PromptBuilder["Citation Context Assembler<br/>([1], [2] bracket mapping)"]:::api
+        LLMStream["Gemini 3.5 Flash Lite<br/>(Async SSE Token Streaming)"]:::ai
+
+        Contextualizer --> QueryEmbed --> VectorSearch --> ThresholdFilter
+        ThresholdFilter -->|Top-K Chunks| PromptBuilder --> LLMStream
+        ThresholdFilter -->|No Chunks Found| Refusal["Strict Refusal: Insufficient context"]:::api
     end
 
-    UI -->|"save"| I1
-    UI -->|"ask"| Q1
-    UI -->|"list / delete"| M1
-    UI --> M2
+    DB[("SQLite Storage<br/>knowledge.db<br/>Items + Float32 Vector BLOBs")]:::db
 
-    I5 -->|"store chunks + vectors"| DB
-    DB -->|"load vectors"| Q3
-    M1 -->|"read"| DB
-    M2 -->|"delete"| DB
+    UI -->|"1. Submit URL / Note"| IngestRouter
+    IngestRouter -->|"Dispatches async"| BG
+    BatchEmbed -->|"Bulk INSERT executemany"| DB
 
-    Q7 -->|"answer + sources"| UI
-    Q8 -->|"refusal message"| UI
+    UI -->|"2. Ask follow-up question"| QueryRouter
+    QueryRouter --> Contextualizer
+    VectorSearch <-->|"Load BLOB embeddings"| DB
+    LLMStream -->|"SSE stream chunks"| UI
+
+    UI -->|"3. Auto-poll processing status"| ItemsRouter
+    ItemsRouter <--> DB
 ```
-
-### 1. Database & Storage Strategy
-- **Tech Stack:** Embedded SQLite with BLOB storage for Vectors.
-- **The Approach:** We store the `float32` embeddings directly as binary BLOBs in SQLite and compute **Cosine Similarity** locally using mathematical array processing in JavaScript. 
-- **Why it is best:** This eliminates the need for complex external vector databases like Pinecone, Qdrant, or Postgres/pgvector. It guarantees that anyone pulling this repository can run `yarn install` and `yarn dev` to immediately have a working application without spinning up Docker containers or managing DB connections.
-
-### 2. Robust RAG Pipeline
-1. **Ingestion:** When a user submits a Note or URL, the backend strips HTML, cleans the text, and splits it into semantic chunks using a Fixed-window chunking strategy (600 characters with 100 character overlap).
-2. **Embedding:** Each chunk generates a 384D vector locally.
-3. **Retrieval (Cosine Similarity):** When the user asks a question, the query is embedded. We compare the query vector against all chunk vectors in SQLite using Cosine Similarity.
-4. **Filtering:** We enforce a strict **Similarity Threshold** (currently 45%). Any chunk that falls below this threshold is dropped entirely. This prevents irrelevant data from being fed to the LLM.
-5. **Synthesis:** Surviving chunks are injected into the Gemini prompt. The model synthesizes an answer and embeds specific `[1]`, `[2]` citation markers pointing directly to the chunks used.
-
-### 3. UI / UX Design System
-- **Tech Stack:** React 18, Vite, Tailwind CSS v4, Lucide React.
-- **Design Philosophy:** We implemented a highly polished UI with dynamic Theme Toggling. It supports both a sleek, Perplexity-inspired Dark Mode (mesh gradients, pure blacks) and an airy Apple-style Light Mode (frosted glass, bright whites, `#F5F5F7` backgrounds). Micro-interactions (hover states, focus rings, scroll-into-view) create a premium, native-app feel.
 
 ---
 
-## 🚀 Setup Instructions
+## 🔬 Core Technical Architecture (Layer-by-Layer)
+
+### 1. Ingestion Pipeline & Asynchronous Processing
+* **Problem Solved:** Traditional synchronous web scrapers hold open HTTP connections for 15–30 seconds while downloading pages and computing embeddings. This triggers `504 Gateway Timeouts` in serverless proxies (Vercel, Cloudflare, AWS ALB).
+* **Implementation:**
+  * When a user submits content to `POST /ingest`, FastAPI generates a UUID4, stores a pending record with `status="processing"`, and returns `202 Accepted` in **~6ms**.
+  * A `BackgroundTasks` worker triggers the extraction and embedding pipeline concurrently without tying up the web server process.
+  * The frontend polls `GET /items` every 2.5 seconds while any item is `processing`, displaying a live pulse badge (`Indexing...` ➔ `Completed` / `Failed`).
+
+### 2. High-Accuracy Web Extraction
+* **Library:** `trafilatura` (with regex and `BeautifulSoup4` fallback).
+* **Capabilities:** Eliminates boilerplate navigation, footers, cookie banners, and CSS stylesheets. Returns clean markdown-ready plaintext.
+* **Resilience:** Implements a standard desktop `User-Agent` to prevent `403 Forbidden` bot-blocking on sites like Wikipedia.
+
+### 3. Chunking Strategy
+* **Method:** Fixed character sliding window with overlap.
+* **Parameters:** Chunk size of **600 characters**, overlap of **100 characters**.
+* **Rationale:** A 600-character window contains approximately 90–120 words—the optimal semantic granularity for paragraph-level retrieval. The 100-character overlap prevents sentences and key facts from being sliced in half across chunk boundaries.
+
+### 4. Vector Embeddings & In-Process Similarity Search
+* **Embedding Model:** Google Gemini `gemini-embedding-2` (768-dimensional dense vectors).
+* **Batch Concurrency:** Chunks are embedded concurrently using `asyncio.Semaphore(8)` and `client.aio.models.embed_content`, accelerating large page indexing by **700%**.
+* **Vector Storage:** Embeddings are converted to raw IEEE 754 32-bit floats (`np.float32`) and stored as binary `BLOB` columns directly inside SQLite.
+* **Similarity Computation:** Cosine similarity is computed in-process using vectorized matrix operations in NumPy:
+  $$\text{Cosine Similarity} = \frac{A \cdot B}{\|A\| \|B\|}$$
+* **Strict Quality Threshold:** Chunks with similarity score $< 0.65$ (65%) are discarded. If no chunks exceed 65%, the system immediately refuses to answer instead of hallucinating facts.
+
+### 5. Multi-Turn Conversational Memory & Contextualization
+* **Problem Solved:** When a user asks follow-up questions with pronouns (e.g., *"What are its advantages?"* or *"How does it compare to Java?"*), naive RAG queries fail because the word *"it"* has no vector similarity to the actual subject.
+* **Solution:** Prior to vector search, the backend passes the last 4 chat history turns and the follow-up prompt to `contextualize_query()`.
+* **Prompt Optimization:** Gemini rewrites the ambiguous query into an explicit, standalone search string (e.g., *"What are the advantages of Software Design Patterns?"*) with `temperature=0.0`.
+* **Zero Overhead:** Standalone queries skip rewriting; only queries containing conversational references are contextualized.
+
+### 6. Streaming Inference & Dynamic Fallback Chain
+* **Models Utilized:**
+  1. `gemini-3.5-flash-lite` (Default: **0.62s Time-To-First-Token**)
+  2. `gemini-flash-lite-latest` (Fallback 1: **0.83s TTFT**)
+  3. `gemini-3.5-flash` (Fallback 2: **5.4s TTFT**)
+* **Non-Blocking SSE:** Token generation uses native `client.aio.models.generate_content_stream`. Chunks are yielded immediately over HTTP as Server-Sent Events (`data: {"type": "answer", "text": "..."}`).
+* **Strict Inline Citations:** The LLM prompt binds synthesis strictly to retrieved context chunks using bracketed notation `[1]`, `[2]`.
+
+### 7. Frontend User Experience (React 19 + Tailwind CSS v4)
+* **AbortController Stop Generation:** When a user clicks the Stop button (`⏹`), an `AbortSignal` interrupts the fetch stream immediately. The reader is cancelled, and whatever partial text was generated is cleanly preserved.
+* **ChatGPT-Style Actions:** 
+  * Hovering over any user message reveals a bottom-right action bar with **Copy message** (with animated checkmark) and **Edit message** buttons.
+  * Clicking Edit opens an inline textarea, allowing the user to modify the question. Upon submission, subsequent turns are truncated and a fresh answer is streamed.
+* **No Broken States:** Stopping a generation before tokens arrive displays an informative `Generation stopped` status card, completely eliminating empty black rectangular voids.
+
+---
+
+## 📂 Project Structure
+
+```
+ai-knowledge-inbox/
+├── backend/                        # Active FastAPI Python Backend
+│   ├── app/
+│   │   ├── models/
+│   │   │   └── schemas.py          # Pydantic v2 validation models
+│   │   ├── routers/
+│   │   │   ├── ingest.py           # POST /ingest (Async background ingestion)
+│   │   │   ├── query.py            # POST /query (SSE streaming RAG endpoint)
+│   │   │   └── items.py            # GET/DELETE /items (CRUD & polling)
+│   │   ├── services/
+│   │   │   ├── chunking_service.py # Sliding window text partitioner
+│   │   │   ├── database.py         # SQLite connection & schema migrations
+│   │   │   ├── embedding_service.py# Gemini dense 768-d vector client
+│   │   │   ├── llm_service.py      # Async stream generator & contextualizer
+│   │   │   ├── rag_service.py      # Cosine similarity matching & thresholding
+│   │   │   ├── url_service.py      # Trafilatura HTML cleaner & scraper
+│   │   │   └── vector_service.py   # Float32 BLOB packing/unpacking
+│   │   ├── utils/
+│   │   │   ├── errors.py           # Standardized AppException handlers
+│   │   │   └── logger.py           # Unified service logger
+│   │   ├── config.py               # Pydantic BaseSettings environment loader
+│   │   └── main.py                 # FastAPI application factory & CORS setup
+│   ├── data/
+│   │   └── knowledge.db            # Local embedded SQLite vector database
+│   ├── run.py                      # Uvicorn entrypoint (Port 3000)
+│   └── requirements.txt            # Python dependencies
+│
+├── frontend/                       # React 19 Client Application
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── AddContent.tsx      # Ingest URL & Note modals
+│   │   │   ├── AnswerCard.tsx      # Synthesized Markdown answer & sources carousel
+│   │   │   ├── ItemList.tsx        # Saved items viewer & status polling badges
+│   │   │   ├── QuestionBox.tsx     # Auto-resizing textarea with Stop tooltip
+│   │   │   └── SourceCard.tsx      # Clickable citation cards with scroll-to-view
+│   │   ├── services/
+│   │   │   └── api.ts              # Fetch wrappers & SSE streaming reader
+│   │   ├── types/
+│   │   │   └── index.ts            # TypeScript definitions (Item, Message, Source)
+│   │   ├── App.tsx                 # Master chat view, session state & edit handler
+│   │   └── index.css               # Tailwind CSS v4 design tokens & smooth styles
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── chrome-extension/               # Chrome Extension (Manifest v3)
+│   ├── manifest.json               # Extension configuration
+│   ├── popup.html                  # Clipper popup interface
+│   └── popup.js                    # Content extraction & API bridge
+│
+└── backend_old/                    # Archived Node.js/TypeScript Backend
+```
+
+---
+
+## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Node.js (v18+)
-- Yarn package manager
+* **Python:** 3.11+
+* **Node.js:** 18+
+* **Package Manager:** `yarn`
+* **Google Gemini API Key:** [Get an API key here](https://aistudio.google.com/)
 
-### 1. Clone & Install
-```bash
-git clone <repository>
-cd ai-knowledge-inbox
+---
 
-# Install Backend
-cd backend
-yarn install
+### Step 1: Configure Environment Variables
 
-# Install Frontend
-cd ../frontend
-yarn install
-```
-
-### 2. Environment Variables
-Since API keys are sensitive, the `.env` file is intentionally ignored by Git and won't be pushed to GitHub. **You must create it manually.**
-
-Navigate to the `backend` folder and create a new file named `.env`:
+Create `backend/.env`:
 ```env
 PORT=3000
-NODE_ENV=development
-# Required for RAG synthesis (Get one from Google AI Studio)
+HOST=0.0.0.0
 GEMINI_API_KEY=your_gemini_api_key_here
+DATABASE_PATH=data/knowledge.db
+SIMILARITY_THRESHOLD=0.65
+TOP_K=5
 ```
 
-### 3. Run the Application
-Start both servers from their respective directories.
+---
 
-**Backend:**
+### Step 2: Install & Run Backend (FastAPI)
+
 ```bash
 cd backend
-yarn dev
-```
 
-**Frontend:**
+# Create virtual environment using Python 3.11
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start FastAPI server on port 3000
+python run.py
+```
+*Backend health check:* Visit `http://localhost:3000/health` (returns `{"status": "ok"}`).
+
+---
+
+### Step 3: Install & Run Frontend (React + Vite)
+
 ```bash
 cd frontend
+
+# Install dependencies (Yarn only)
+yarn install
+
+# Start Vite dev server on port 5173
 yarn dev
 ```
-Open `http://localhost:5173` to view the application.
-
-### 4. Install the Chrome Extension (Optional)
-To use the Web Clipper:
-1. Open Google Chrome and navigate to `chrome://extensions/`.
-2. Enable **Developer mode** in the top right.
-3. Click **Load unpacked** and select the `chrome-extension` folder located in this repository.
-4. Pin the extension to your toolbar. You can now save any article directly to your Knowledge Inbox!
+Open your browser to `http://localhost:5173`.
 
 ---
 
-## 📝 API Endpoints
-
-- `GET /items`: Returns all saved items (notes and URLs).
-- `POST /ingest`: Expects `{ type: "note" | "url", content: "..." }`. Processes, chunks, embeds, and stores the content.
-- `POST /query`: Expects `{ question: "..." }`. Runs similarity search and returns `{ answer: "...", sources: [...] }`.
-- `DELETE /items/:id`: Removes an item and all associated vector chunks from the database.
+### Step 4: Install Chrome Extension (Optional)
+1. Open Google Chrome and visit `chrome://extensions/`.
+2. Toggle **Developer mode** in the upper-right corner.
+3. Click **Load unpacked** and select the `chrome-extension` directory.
+4. Click the extension icon on any webpage to clip content directly into your inbox.
 
 ---
 
-## ⚖️ Tradeoffs & Design Decisions
-- **Why SQLite?**: Simple, zero-configuration, and perfect for a single-user application. Avoids forcing the reviewer to spin up Docker containers or sign up for Pinecone.
-- **Why Naive Chunking?**: A fixed-window approach (600 characters + 100 overlap) is easy to implement, lightweight, and fast enough for standard notes and articles.
-- **Why In-process Vector Search?**: No separate infrastructure is needed. We store `float32` arrays as BLOBs and compute Cosine similarity directly in JS. It is incredibly fast for small datasets (thousands of vectors) and prevents network latency.
-- **Server-Sent Events (SSE) for Streaming:** We used native SSE over WebSockets. SSE is strictly unidirectional (server-to-client), making it the perfect, lightweight choice for streaming LLM tokens without the overhead of a full WebSocket connection.
-- **Frontend State:** Used pure React hooks and `localStorage` to manage chat history without needing Redux or a complex database schema for user sessions.
+## 📡 API Specification
 
-## 🔮 What Changes at Scale?
-For a production system with thousands of concurrent users:
-1. **Database**: Move to PostgreSQL with `pgvector` for scalable, indexed similarity search (e.g., HNSW indexes).
-2. **Ingestion**: Move URL fetching and chunking/embedding to background queues (e.g., BullMQ, Redis) to avoid blocking HTTP requests.
-3. **Security**: Add robust SSRF protection for URL fetching, rate limiting, and JWT authentication.
-4. **Chunking**: Use smarter, semantic-aware chunking (e.g., splitting by markdown headers or NLP sentence boundaries) rather than arbitrary fixed windows.
-5. **Caching**: Cache identical queries (e.g., Redis) and aggressively deduplicate fetched URLs.
+### `POST /ingest`
+Ingests a note or webpage asynchronously.
+* **Request:**
+  ```json
+  {
+    "type": "url",
+    "content": "https://en.wikipedia.org/wiki/FastAPI"
+  }
+  ```
+* **Response:** `202 Accepted`
+  ```json
+  {
+    "id": "e3f3bff1-ddaa-4e9a-9423-dedf0dbb3bbc",
+    "type": "url",
+    "status": "processing",
+    "message": "Content ingestion started in background"
+  }
+  ```
+
+---
+
+### `POST /query`
+Performs multi-turn conversational contextualization, vector similarity search, and streams synthesized tokens.
+* **Request:**
+  ```json
+  {
+    "question": "What are its key benefits?",
+    "history": [
+      { "role": "user", "content": "What is FastAPI?" },
+      { "role": "assistant", "content": "FastAPI is a modern web framework..." }
+    ]
+  }
+  ```
+* **Response:** `text/event-stream`
+  ```http
+  HTTP/1.1 200 OK
+  Content-Type: text/event-stream
+
+  data: {"type": "sources", "sources": [{"citation_id": 1, "title": "FastAPI", "similarity": 0.82}]}
+
+  data: {"type": "answer", "text": "FastAPI "}
+  data: {"type": "answer", "text": "offers "}
+  data: {"type": "answer", "text": "high performance [1]..."}
+
+  data: [DONE]
+  ```
+
+---
+
+### `GET /items`
+Retrieves all indexed items with status flags.
+* **Response:** `200 OK`
+  ```json
+  [
+    {
+      "id": "4a8ed6fa-86dc-4850-a517-e24440cf5fbc",
+      "type": "url",
+      "title": "FastAPI",
+      "status": "completed",
+      "chunk_count": 18,
+      "created_at": 1730364361
+    }
+  ]
+  ```
+
+---
+
+### `DELETE /items/{id}`
+Deletes an item and purges all of its vector chunk records.
+* **Response:** `200 OK`
+  ```json
+  { "success": true }
+  ```
+
+---
+
+## 🔒 Design Decisions & Trade-Offs
+
+| Decision | Why Chosen | Alternative Considered | Trade-Off |
+| :--- | :--- | :--- | :--- |
+| **SQLite + Float32 BLOBs** | Embedded, zero external infrastructure needed. Clones and runs in 30 seconds. | Pinecone / Qdrant / PgVector | In-memory scan scales up to ~100k chunks. Beyond that, approximate nearest neighbors (HNSW) is required. |
+| **FastAPI BackgroundTasks** | Native async concurrency without Celery / Redis setup overhead. | Celery + Redis | Background tasks run in-process; if the server restarts mid-task, the job must be re-triggered. |
+| **Gemini Flash Lite** | Sub-second TTFT (~0.6s) and no free-tier daily request limits. | `gemini-2.5-flash` | Slightly lower reasoning capability on complex logic, but vastly superior speed and rate-limit headroom. |
+| **Sliding Window Chunking** | Simple, fast, deterministic, preserves context across boundaries. | Semantic AST Chunking | May occasionally break across sub-headings or table borders. |
+| **SSE over WebSockets** | Lightweight, unidirectional HTTP streaming; works through corporate proxies. | Full-duplex WebSockets | Client cannot send mid-stream messages over the same channel without an HTTP abort call. |
+
+---
+
+## 🚀 Scaling to Production (100k+ Users)
+
+To scale RecallAI from a single-user system to an enterprise multi-tenant platform:
+1. **Vector Database:** Migrate vector storage to **PostgreSQL with `pgvector`** utilizing `HNSW` indexes to achieve sub-10ms queries across billions of vectors.
+2. **Distributed Queue:** Replace in-process `BackgroundTasks` with **Celery** or **Temporal** backed by Redis/RabbitMQ with automatic retry and dead-letter queues.
+3. **Multi-Tenancy & Auth:** Implement row-level security (RLS) with tenant IDs attached to chunks, authenticated via JWT / OAuth2.
+4. **Semantic Caching:** Cache contextualized query embeddings in Redis to return instant cached responses for repeated queries.

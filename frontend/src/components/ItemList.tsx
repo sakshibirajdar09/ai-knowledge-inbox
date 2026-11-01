@@ -73,6 +73,16 @@ export const ItemList = ({ items, loading, onDelete }: ItemListProps) => {
                       <Clock size={10} />
                       {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </span>
+                    {item.status === 'processing' && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse">
+                        <Loader2 size={9} className="animate-spin" /> Indexing
+                      </span>
+                    )}
+                    {item.status === 'failed' && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20" title={item.errorMessage || "Failed to index"}>
+                        Failed
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -80,10 +90,10 @@ export const ItemList = ({ items, loading, onDelete }: ItemListProps) => {
               {onDelete && (
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                  className="p-2 text-gray-400 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all outline-none"
+                  className="p-2.5 sm:p-2 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all outline-none cursor-pointer active:scale-90"
                   title="Remove item"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={15} />
                 </button>
               )}
             </div>

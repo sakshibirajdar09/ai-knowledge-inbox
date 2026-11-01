@@ -1,0 +1,18 @@
+services:
+  recallai-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: recallai_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PORT=3000
+      - HOST=0.0.0.0
+      - DATABASE_PATH=/app/data/knowledge.db
+      - SIMILARITY_THRESHOLD=0.65
+      - TOP_K=5
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

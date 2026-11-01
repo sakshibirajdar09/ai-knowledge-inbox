@@ -37,53 +37,69 @@ export const ingestContent = async (type: 'note' | 'url', content: string, title
 
 export const queryKnowledgeStream = async (
   question: string,
+  history: { role: 'user' | 'assistant'; content: string }[],
   onSources: (sources: any[]) => void,
-  onAnswerChunk: (text: string) => void
+  onAnswerChunk: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<void> => {
-  const response = await fetch(`${API_URL}/query`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ question }),
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to query knowledge');
-  }
+  try {
+    const response = await fetch(`${API_URL}/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ question, history }),
+      signal,
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to query knowledge');
+    }
 
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('No reader available');
-  
-  const decoder = new TextDecoder();
-  let buffer = '';
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('No reader available');
+    
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    
-    buffer += decoder.decode(value, { stream: true });
-    
-    const lines = buffer.split('\n\n');
-    buffer = lines.pop() || '';
-    
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const dataStr = line.slice(6);
-        if (dataStr === '[DONE]') return;
-        
-        try {
-          const data = JSON.parse(dataStr);
-          if (data.type === 'sources') {
-            onSources(data.sources);
-          } else if (data.type === 'answer') {
-            onAnswerChunk(data.text);
+    while (true) {
+      if (signal?.aborted) {
+        await reader.cancel();
+        break;
+      }
+
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.slice(6);
+          if (dataStr === '[DONE]') return;
+          
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.type === 'sources') {
+              onSources(data.sources);
+            } else if (data.type === 'answer') {
+              onAnswerChunk(data.text);
+            }
+          } catch (e) {
+            console.error("Error parsing SSE JSON", e, dataStr);
           }
-        } catch (e) {
-          console.error("Error parsing SSE JSON", e, dataStr);
         }
       }
     }
+  } catch (err: any) {
+    if (err.name === 'AbortError' || signal?.aborted) {
+      // User clicked stop - normal expected cancellation
+      return;
+    }
+    throw err;
   }
 };
 

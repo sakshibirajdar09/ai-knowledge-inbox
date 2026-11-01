@@ -35,7 +35,7 @@ export const AddContent = ({ onSuccess }: AddContentProps) => {
       <div className="flex items-center gap-1 mb-5 bg-gray-100 dark:bg-[#0a0a0b] p-1 rounded-lg border border-gray-200 dark:border-white/[0.02] inline-flex">
         <button
           onClick={() => { setType('note'); setError(''); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer active:scale-95 transition-all ${
             type === 'note' ? 'bg-white dark:bg-[#2a2a2d] text-black dark:text-white shadow-sm dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
@@ -43,7 +43,7 @@ export const AddContent = ({ onSuccess }: AddContentProps) => {
         </button>
         <button
           onClick={() => { setType('url'); setError(''); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer active:scale-95 transition-all ${
             type === 'url' ? 'bg-white dark:bg-[#2a2a2d] text-black dark:text-white shadow-sm dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
@@ -82,7 +82,7 @@ export const AddContent = ({ onSuccess }: AddContentProps) => {
           <button
             type="submit"
             disabled={isLoading || !content.trim()}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black text-xs font-semibold rounded-md transition-all disabled:opacity-20 disabled:cursor-not-allowed outline-none shadow-sm dark:shadow-none"
+            className="flex items-center gap-1.5 px-4 py-2 bg-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 active:scale-95 text-white dark:text-black text-xs font-semibold rounded-lg transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed outline-none shadow-sm dark:shadow-none"
           >
             {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
             {isLoading ? 'Indexing...' : 'Add'}
